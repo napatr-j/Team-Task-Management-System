@@ -105,6 +105,22 @@ export function LoginForm({
           </form>
         </CardContent>
       </Card>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full"
+        onClick={async () => {
+          const supabase = createClient();
+          await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo: "http://localhost:3000/auth/callback",
+            },
+          });
+        }}
+      >
+        Continue with Google
+      </Button>
     </div>
   );
 }
