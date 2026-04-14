@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LayoutDashboard, Users } from "lucide-react";
 
 interface Group {
@@ -18,10 +18,12 @@ const groupTools = ["Calendar", "Task Board", "Task List"];
 
 export default function Sidebar() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedGroupId = searchParams.get("group");
   const [groups, setGroups] = useState<Group[]>([]);
-  const [activeSection, setActiveSection] = useState("dashboard");
+  const [hoveredGroupId, setHoveredGroupId] = useState<string | null>(null);
+  const activeSection = pathname?.startsWith("/protected/groups") ? "groups" : "dashboard";
 
   useEffect(() => {
     async function loadGroups() {
@@ -40,15 +42,13 @@ export default function Sidebar() {
   const handleGroupClick = (groupId: string) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.set("group", groupId);
-    router.push(`?${params.toString()}`);
-    setActiveSection("groups");
+    router.push(`${pathname ?? "/protected/groups"}?${params.toString()}`);
   };
 
   const clearGroup = () => {
     const params = new URLSearchParams(Array.from(searchParams.entries()));
     params.delete("group");
     router.push(params.toString() ? `?${params.toString()}` : "/protected/dashboard");
-    setActiveSection("dashboard");
   };
 
   return (
@@ -75,8 +75,9 @@ export default function Sidebar() {
                 onClick={() => {
                   if (item.key === "dashboard") {
                     clearGroup();
+                    router.push("/protected/dashboard");
                   } else {
-                    setActiveSection("groups");
+                    router.push("/protected/groups");
                   }
                 }}
                 className={`flex w-full items-center gap-3 rounded-2xl border-l-4 border-transparent px-3 py-3 text-left text-sm transition-all duration-200 ${
@@ -94,39 +95,41 @@ export default function Sidebar() {
           <div className="space-y-3 border-t border-team-olive/20 pt-4">
             <div className="space-y-2">
               {groups.map((group) => (
-                <button
+                <div
                   key={group.id}
-                  type="button"
-                  onClick={() => handleGroupClick(group.id)}
-                  className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm transition-all duration-200 ${
-                    selectedGroupId === group.id
-                      ? "bg-team-olive/10 font-semibold text-team-olive"
-                      : "text-team-text/80 hover:bg-team-olive/10"
-                  }`}
+                  className="group"
+                  onMouseEnter={() => setHoveredGroupId(group.id)}
+                  onMouseLeave={() => setHoveredGroupId(null)}
                 >
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-team-olive/10 text-team-olive">
-                    {group.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="hidden transition-opacity duration-200 group-hover:inline">{group.name}</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleGroupClick(group.id)}
+                    className="group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm text-team-text/80 transition-all duration-200 hover:bg-team-olive/10"
+                  >
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-2xl bg-team-olive/10 text-team-olive transition-transform duration-300 ease-out group-hover:scale-105 group-hover:shadow-lg">
+                      {group.name.slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="hidden transition-opacity duration-200 group-hover:inline">{group.name}</span>
+                  </button>
+
+                  {hoveredGroupId === group.id && (
+                    <div className="mt-2 space-y-2 rounded-2xl border border-team-olive/10 bg-[#F4F5EB] p-3">
+                      <p className="text-[11px] uppercase tracking-[0.24em] text-team-text/60">Group tools</p>
+                      {groupTools.map((item) => (
+                        <button
+                          key={item}
+                          type="button"
+                          className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm text-team-text/80 transition-all duration-200 hover:bg-team-olive/10"
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full bg-team-olive" />
+                          <span>{item}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-
-            {selectedGroupId && (
-              <div className="space-y-2 pt-4">
-                <p className="hidden text-xs uppercase tracking-[0.24em] text-team-text/60 group-hover:block">Group tools</p>
-                {groupTools.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm text-team-text/80 transition-all duration-200 hover:bg-team-olive/10"
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full bg-team-olive" />
-                    <span className="hidden transition-opacity duration-200 group-hover:inline">{item}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
