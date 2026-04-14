@@ -6,7 +6,15 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function TopBar() {
+interface TopBarProps {
+  pageLabel?: string;
+  pageTitle?: string;
+}
+
+export default function TopBar({
+  pageLabel = "Dashboard",
+  pageTitle = "Project overview",
+}: TopBarProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [initials, setInitials] = useState("ME");
   const router = useRouter();
