@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import GetStartedCta from "@/components/landing-page/GetStartedCta";
 
 const links = [
-  { label: "Features", href: "#features" },
-  { label: "How it Works", href: "#how-it-works" },
+  { label: "Features", target: "features" },
+  { label: "How it Works", target: "how-it-works" },
 ];
+
+const handleScrollTo = (id: string) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+};
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -29,27 +36,29 @@ export default function Navbar() {
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <a
-          href="#hero"
+        <button
+          onClick={() => handleScrollTo("hero")}
           className="text-lg font-semibold tracking-tight text-[#1A1A1A]"
         >
           TeamSync
-        </a>
+        </button>
 
+        {/* Desktop Nav */}
         <nav className="hidden items-center gap-4 md:flex">
           {links.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
+            <button
+              key={link.target}
+              onClick={() => handleScrollTo(link.target)}
               className="text-sm font-medium text-[#494949] transition hover:text-[#656D3F]"
             >
               {link.label}
-            </a>
+            </button>
           ))}
 
           <GetStartedCta />
         </nav>
 
+        {/* Mobile Button */}
         <button
           type="button"
           className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white text-[#1A1A1A] shadow-sm transition hover:border-[#84934A]/60 md:hidden"
@@ -67,6 +76,7 @@ export default function Navbar() {
         </button>
       </div>
 
+      {/* Mobile Menu */}
       <div
         className={`md:hidden ${
           menuOpen ? "block" : "hidden"
@@ -74,14 +84,16 @@ export default function Navbar() {
       >
         <div className="space-y-2 px-5 pb-6 pt-4">
           {links.map((link) => (
-            <a
-              key={link.href}
-              href={link.href}
-              className="block rounded-2xl px-4 py-3 text-sm font-medium text-[#494949] transition hover:bg-[#EEF1E3]"
-              onClick={() => setMenuOpen(false)}
+            <button
+              key={link.target}
+              onClick={() => {
+                handleScrollTo(link.target);
+                setMenuOpen(false);
+              }}
+              className="block w-full rounded-2xl px-4 py-3 text-left text-sm font-medium text-[#494949] transition hover:bg-[#EEF1E3]"
             >
               {link.label}
-            </a>
+            </button>
           ))}
 
           <GetStartedCta
