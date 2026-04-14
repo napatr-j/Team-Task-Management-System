@@ -1,14 +1,26 @@
-import { createClient } from "@/lib/supabase/server";
-import { Suspense } from "react";
+"use client";
 
-export default async function ProtectedPage() {
-  const supabase = await createClient();
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export default function ProtectedPage() {
+  const [userJson, setUserJson] = useState<string>("Loading...");
 
-  const userJson = JSON.stringify(user, null, 2);
+  useEffect(() => {
+    const supabase = createClient();
+
+    async function loadUser() {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data?.session?.user) {
+        setUserJson("No active user session.");
+        return;
+      }
+
+      setUserJson(JSON.stringify(data.session.user, null, 2));
+    }
+
+    loadUser();
+  }, []);
 
   return (
     <div className="flex-1 w-full flex flex-col gap-12">
@@ -24,7 +36,6 @@ export default async function ProtectedPage() {
           {userJson}
         </pre>
       </div>
-
     </div>
   );
 }
