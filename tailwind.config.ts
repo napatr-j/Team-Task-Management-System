@@ -14,6 +14,13 @@ export default {
         inter: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       colors: {
+        bg: "#ECECEC",
+        olive: "#84934A",
+        oliveDark: "#656D3F",
+        contrast: "#492828",
+        surface: "#FFFFFF",
+        text: "#1A1A1A",
+        textMuted: "rgba(26, 26, 26, 0.5)",
         team: {
           bg: "#ECECEC",
           olive: "#84934A",

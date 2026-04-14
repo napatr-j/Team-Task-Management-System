@@ -10,5 +10,5 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect("http://localhost:3000/protected");
+  return NextResponse.redirect("http://localhost:3000/protected/dashboard");
 }
