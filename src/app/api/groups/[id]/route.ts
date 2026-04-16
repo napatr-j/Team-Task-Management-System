@@ -19,8 +19,9 @@ function mapRole(roleId: number | null | undefined) {
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const supabase = await createClient();
     const {
@@ -35,7 +36,7 @@ export async function GET(
     const { data: team, error: teamError } = await supabase
       .from("teams")
       .select("id,name,created_at,created_by")
-      .eq("id", params.id)
+      .eq("id", id)
       .single();
 
     if (teamError || !team) {
