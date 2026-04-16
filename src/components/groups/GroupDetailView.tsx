@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { InviteMemberDialog, type InvitedMember } from "@/components/groups/InviteMemberDialog";
 import { Group } from "@/types/group";
@@ -16,6 +17,7 @@ export function GroupDetailView({ group }: GroupDetailViewProps) {
   const [roleLoadingId, setRoleLoadingId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
+  const router = useRouter();
   const isAdmin = group.currentUserRole === "Admin";
   const canManage = group.canManageMembers;
   const currentUserId = group.currentUserId;
@@ -117,6 +119,7 @@ export function GroupDetailView({ group }: GroupDetailViewProps) {
               type="button"
               variant="ghost"
               className="text-olive hover:opacity-80"
+              onClick={() => router.push(`/protected/groups/${group.id}/calendar`)}
             >
               Calendar
             </Button>
@@ -124,6 +127,7 @@ export function GroupDetailView({ group }: GroupDetailViewProps) {
               type="button"
               variant="ghost"
               className="text-olive hover:opacity-80"
+              onClick={() => router.push(`/protected/groups/${group.id}/task_board`)}
             >
               Task Board
             </Button>
@@ -131,6 +135,7 @@ export function GroupDetailView({ group }: GroupDetailViewProps) {
               type="button"
               variant="ghost"
               className="text-textMuted hover:text-olive"
+              onClick={() => router.push(`/protected/groups/${group.id}/task_list`)}
             >
               Task List
             </Button>
