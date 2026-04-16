@@ -3,9 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { GroupDetailView } from "@/components/groups/GroupDetailView";
 
 interface GroupPageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 function buildInitials(fullName: string | null | undefined) {
@@ -25,6 +25,7 @@ function mapRole(roleId: number | null | undefined) {
 }
 
 export default async function GroupPage({ params }: GroupPageProps) {
+  const { id } = await params;
   const supabase = await createClient();
   const {
     data: { user },
@@ -43,7 +44,7 @@ export default async function GroupPage({ params }: GroupPageProps) {
   const { data: team, error: teamError } = await supabase
     .from("teams")
     .select("id,name,created_at,created_by")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (teamError || !team) {
