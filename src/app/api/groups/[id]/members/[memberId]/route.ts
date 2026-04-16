@@ -16,8 +16,9 @@ function isManagerRole(roleId: number | null | undefined) {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string; memberId: string } },
+  { params }: { params: Promise<{ id: string; memberId: string }> },
 ) {
+  const { id, memberId } = await params;
   try {
     const supabase = await createClient();
     const {
@@ -43,7 +44,7 @@ export async function PATCH(
     const { data: currentRoleRow, error: currentRoleError } = await supabase
       .from("user_roles")
       .select("role_id")
-      .eq("team_id", params.id)
+      .eq("team_id", id)
       .eq("user_id", user.id)
       .single();
 
@@ -63,8 +64,8 @@ export async function PATCH(
     const { data: targetRoleRow, error: targetRoleError } = await supabase
       .from("user_roles")
       .select("role_id")
-      .eq("team_id", params.id)
-      .eq("user_id", params.memberId)
+      .eq("team_id", id)
+      .eq("user_id", memberId)
       .single();
 
     if (targetRoleError) {
@@ -75,7 +76,7 @@ export async function PATCH(
       return NextResponse.json({ message: "Member not found in group" }, { status: 404 });
     }
 
-    if (isAdminRole(targetRoleRow.role_id) && !isAdminRole(currentRoleId) && user.id !== params.memberId) {
+    if (isAdminRole(targetRoleRow.role_id) && !isAdminRole(currentRoleId) && user.id !== memberId) {
       return NextResponse.json({ message: "Only admins can change another admin's role" }, { status: 403 });
     }
 
@@ -88,8 +89,8 @@ export async function PATCH(
     const { error: updateError } = await supabase
       .from("user_roles")
       .update({ role_id: roleIdMap[role] })
-      .eq("team_id", params.id)
-      .eq("user_id", params.memberId);
+      .eq("team_id", id)
+      .eq("user_id", memberId);
 
     if (updateError) {
       return NextResponse.json({ message: "Unable to update role", error: updateError.message }, { status: 500 });
@@ -106,8 +107,9 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string; memberId: string } },
+  { params }: { params: Promise<{ id: string; memberId: string }> },
 ) {
+  const { id, memberId } = await params;
   try {
     const supabase = await createClient();
     const {
@@ -122,7 +124,7 @@ export async function DELETE(
     const { data: currentRoleRow, error: currentRoleError } = await supabase
       .from("user_roles")
       .select("role_id")
-      .eq("team_id", params.id)
+      .eq("team_id", id)
       .eq("user_id", user.id)
       .single();
 
@@ -134,18 +136,18 @@ export async function DELETE(
     const { data: targetRoleRow } = await supabase
       .from("user_roles")
       .select("role_id")
-      .eq("team_id", params.id)
-      .eq("user_id", params.memberId)
+      .eq("team_id", id)
+      .eq("user_id", memberId)
       .single();
 
-    if (targetRoleRow?.role_id === 1 && currentRoleId !== 1 && user.id !== params.memberId) {
+    if (targetRoleRow?.role_id === 1 && currentRoleId !== 1 && user.id !== memberId) {
       return NextResponse.json({ message: "Only admins can remove other admins" }, { status: 403 });
     }
 
     const canRemove =
       currentRoleId === 1 ||
       currentRoleId === 2 ||
-      user.id === params.memberId;
+      user.id === memberId;
 
     if (!canRemove) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
@@ -154,8 +156,8 @@ export async function DELETE(
     const { data: deleted, error: deleteError } = await supabase
       .from("team_members")
       .delete()
-      .eq("team_id", params.id)
-      .eq("user_id", params.memberId);
+      .eq("team_id", id)
+      .eq("user_id", memberId);
 
     if (deleteError) {
       return NextResponse.json(
@@ -164,7 +166,8 @@ export async function DELETE(
       );
     }
 
-    if (!deleted || (Array.isArray(deleted) && deleted.length === 0)) {
+    const deletedData = deleted as any;
+    if (!deletedData || (Array.isArray(deletedData) && deletedData.length === 0)) {
       return NextResponse.json(
         { message: "Member not found in group" },
         { status: 404 },
