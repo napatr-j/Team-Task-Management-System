@@ -22,8 +22,9 @@ function buildInitials(fullName: string | null | undefined, email: string) {
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const supabase = await createClient();
     const {
@@ -62,7 +63,7 @@ export async function POST(
     const { data: existingMembership } = await supabase
       .from("team_members")
       .select("id")
-      .eq("team_id", params.id)
+      .eq("team_id", id)
       .eq("user_id", targetUser.id)
       .single();
 
@@ -90,7 +91,7 @@ export async function POST(
     }
 
     const { error: inviteError } = await supabase.from("team_members").insert({
-      team_id: params.id,
+      team_id: id,
       user_id: targetUser.id,
     });
 
@@ -103,7 +104,7 @@ export async function POST(
 
     const { error: roleError } = await supabase.from("user_roles").insert({
       user_id: targetUser.id,
-      team_id: params.id,
+      team_id: id,
       role_id: roleIdMap[role],
     });
 
