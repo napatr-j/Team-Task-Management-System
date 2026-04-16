@@ -14,7 +14,11 @@ const navigation = [
   { label: "Groups", icon: Users, key: "groups" },
 ];
 
-const groupTools = ["Calendar", "Task Board", "Task List"];
+const groupTools = [
+  { label: "Calendar", url: (id: string) => `/protected/groups/${id}/calendar` },
+  { label: "Task Board", url: (id: string) => `/protected/groups/${id}/task_board` },
+  { label: "Task List", url: (id: string) => `/protected/groups/${id}/task_list` },
+];
 
 export default function Sidebar() {
   const router = useRouter();
@@ -117,12 +121,13 @@ export default function Sidebar() {
                       <p className="text-[11px] uppercase tracking-[0.24em] text-team-text/60">Group tools</p>
                       {groupTools.map((item) => (
                         <button
-                          key={item}
+                          key={item.label}
                           type="button"
+                          onClick={() => router.push(item.url(group.id))}
                           className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left text-sm text-team-text/80 transition-all duration-200 hover:bg-team-olive/10"
                         >
                           <span className="h-2.5 w-2.5 rounded-full bg-team-olive" />
-                          <span>{item}</span>
+                          <span>{item.label}</span>
                         </button>
                       ))}
                     </div>
