@@ -1,5 +1,6 @@
-import { Task } from "@/types/calendar";
+import { Task, CalendarEvent } from "@/types/calendar";
 import TaskCard from "./TaskCard";
+import EventCard from "./EventCard";
 
 interface Props {
   date: Date;
@@ -7,8 +8,10 @@ interface Props {
   isSelected: boolean;
   isCurrentMonth: boolean;
   tasks: Task[];
+  events: CalendarEvent[];
   onClick: () => void;
   onTaskClick: (task: Task) => void;
+  onEventClick: (event: CalendarEvent) => void;
 }
 
 export default function CalendarCell({
@@ -17,8 +20,10 @@ export default function CalendarCell({
   isSelected,
   isCurrentMonth,
   tasks,
+  events,
   onClick,
   onTaskClick,
+  onEventClick,
 }: Props) {
   return (
     <div
@@ -37,11 +42,14 @@ export default function CalendarCell({
         )}
       </div>
       <div className="flex flex-col gap-1 mt-1">
-        {tasks.slice(0, 3).map((task) => (
+        {tasks.slice(0, 2).map((task) => (
           <TaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} />
         ))}
-        {tasks.length > 3 && (
-          <span className="text-xs text-[#84934A]">+{tasks.length - 3} more</span>
+        {events.slice(0, 2).map((event) => (
+          <EventCard key={event.id} event={event} onClick={() => onEventClick(event)} />
+        ))}
+        {tasks.length + events.length > 3 && (
+          <span className="text-xs text-[#84934A]">+{tasks.length + events.length - 3} more</span>
         )}
       </div>
     </div>
