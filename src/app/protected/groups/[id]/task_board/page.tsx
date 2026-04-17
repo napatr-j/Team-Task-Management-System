@@ -1,12 +1,15 @@
+"use client";
+
+import { useParams } from "next/navigation";
 import GroupTaskBoard from "@/components/groups/GroupTaskBoard";
 
-interface GroupTaskBoardPageProps {
-  params: Promise<{
-    id: string;
-  }>;
-}
+export default function GroupTaskBoardPage() {
+  const params = useParams();
+  const groupId = params?.id;
 
-export default async function GroupTaskBoardPage({ params }: GroupTaskBoardPageProps) {
-  const { id } = await params;
-  return <GroupTaskBoard groupId={id} />;
+  if (!groupId) {
+    return null;
+  }
+
+  return <GroupTaskBoard groupId={groupId} />;
 }
