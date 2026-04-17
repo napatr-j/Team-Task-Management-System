@@ -1,13 +1,17 @@
-import { Task, User } from "@/types/calendar";
-import { useState } from "react";
+import { Task } from "@/types/calendar";
+
+type Subtask = {
+  title: string;
+  status: Task["status"];
+  priority: Task["priority"];
+};
 
 interface Props {
-  subtasks: Partial<Task>[];
-  setSubtasks: (subs: Partial<Task>[]) => void;
-  users: User[];
+  subtasks: Subtask[];
+  setSubtasks: (subs: Subtask[]) => void;
 }
 
-export default function SubtaskForm({ subtasks, setSubtasks, users }: Props) {
+export default function SubtaskForm({ subtasks, setSubtasks }: Props) {
   const addSubtask = () => setSubtasks([...subtasks, { title: "", status: "todo", priority: "low" }]);
   const removeSubtask = (idx: number) => setSubtasks(subtasks.filter((_, i) => i !== idx));
   const updateSubtask = (idx: number, field: string, value: string) => {
@@ -43,7 +47,7 @@ export default function SubtaskForm({ subtasks, setSubtasks, users }: Props) {
             onChange={e => updateSubtask(idx, "status", e.target.value)}
           >
             <option value="todo">To Do</option>
-            <option value="inprogress">In Progress</option>
+            <option value="in_progress">In Progress</option>
             <option value="done">Done</option>
           </select>
           <select
