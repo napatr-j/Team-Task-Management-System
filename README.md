@@ -1,109 +1,126 @@
-<a href="https://demo-nextjs-with-supabase.vercel.app/">
-  <img alt="Next.js and Supabase Starter Kit - the fastest way to build apps with Next.js and Supabase" src="https://demo-nextjs-with-supabase.vercel.app/opengraph-image.png">
-  <h1 align="center">Next.js and Supabase Starter Kit</h1>
-</a>
+# TeamSync — Team Task Management System
 
-<p align="center">
- The fastest way to build apps with Next.js and Supabase
-</p>
+TeamSync is a collaborative team-task management system designed to help teams organize **tasks**, **schedules**, and **project activities** in one place. It combines task assignment, progress tracking, and **calendar-based planning** so teams can clearly visualize workloads, avoid missed deadlines, and keep collaboration efficient.
 
-<p align="center">
-  <a href="#features"><strong>Features</strong></a> ·
-  <a href="#demo"><strong>Demo</strong></a> ·
-  <a href="#deploy-to-vercel"><strong>Deploy to Vercel</strong></a> ·
-  <a href="#clone-and-run-locally"><strong>Clone and run locally</strong></a> ·
-  <a href="#feedback-and-issues"><strong>Feedback and issues</strong></a>
-  <a href="#more-supabase-examples"><strong>More Examples</strong></a>
-</p>
-<br/>
+## Project description
 
-## Features
+**Problem addressed**
 
-- Works across the entire [Next.js](https://nextjs.org) stack
-  - App Router
-  - Pages Router
-  - Proxy
-  - Client
-  - Server
-  - It just works!
-- supabase-ssr. A package to configure Supabase Auth to use cookies
-- Password-based authentication block installed via the [Supabase UI Library](https://supabase.com/ui/docs/nextjs/password-based-auth)
-- Styling with [Tailwind CSS](https://tailwindcss.com)
-- Components with [shadcn/ui](https://ui.shadcn.com/)
-- Optional deployment with [Supabase Vercel Integration and Vercel deploy](#deploy-your-own)
-  - Environment variables automatically assigned to Vercel project
+- Tasks are not clearly assigned to responsible members
+- Team members may miss deadlines
+- Project schedules are not clearly visualized
+- Communication about task updates becomes inefficient
 
-## Demo
+**What TeamSync provides**
 
-You can view a fully working demo at [demo-nextjs-with-supabase.vercel.app](https://demo-nextjs-with-supabase.vercel.app/).
+- Task creation, assignment, and progress tracking
+- Calendar scheduling with time ranges / events
+- Notes and collaboration around tasks/events
+- Role-based access control (Admin / Team Manager / Team Member)
 
-## Deploy to Vercel
+## System architecture overview
 
-Vercel deployment will guide you through creating a Supabase account and project.
+This repository is implemented as a **Next.js (App Router)** web app. “Backend” functionality is provided via **Next.js API Route Handlers** under `src/app/api/*`, and data/auth are handled by **Supabase** (PostgreSQL + Auth).
 
-After installation of the Supabase integration, all relevant environment variables will be assigned to the project so the deployment is fully functioning.
+**High-level architecture**
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&project-name=nextjs-with-supabase&repository-name=nextjs-with-supabase&demo-title=nextjs-with-supabase&demo-description=This+starter+configures+Supabase+Auth+to+use+cookies%2C+making+the+user%27s+session+available+throughout+the+entire+Next.js+app+-+Client+Components%2C+Server+Components%2C+Route+Handlers%2C+Server+Actions+and+Middleware.&demo-url=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2F&external-id=https%3A%2F%2Fgithub.com%2Fvercel%2Fnext.js%2Ftree%2Fcanary%2Fexamples%2Fwith-supabase&demo-image=https%3A%2F%2Fdemo-nextjs-with-supabase.vercel.app%2Fopengraph-image.png)
+- **Client UI**: Next.js + React components (`src/components/*`, `src/app/*`)
+- **API layer**: Next.js route handlers (`src/app/api/*`)
+- **Auth**: Supabase Auth via `@supabase/ssr` (cookie/session-based)
+- **Database**: PostgreSQL (Supabase) for tasks, teams, events, roles, etc.
 
-The above will also clone the Starter kit to your GitHub, you can clone that locally and develop locally.
+**Typical flow**
 
-If you wish to just develop locally and not deploy to Vercel, [follow the steps below](#clone-and-run-locally).
+1. User signs up / logs in (Supabase Auth).
+2. App reads user session on server routes and pages.
+3. API routes validate membership/roles (for team-scoped actions).
+4. API routes read/write Postgres tables through Supabase.
+5. UI renders tasks and calendar views from API responses.
 
-## Clone and run locally
+## User roles & permissions
 
-1. You'll first need a Supabase project which can be made [via the Supabase dashboard](https://database.new)
+TeamSync supports **3 roles**:
 
-2. Create a Next.js app using the Supabase Starter template npx command
+### Administrator
 
-   ```bash
-   npx create-next-app --example with-supabase with-supabase-app
-   ```
+- **Responsibilities**: Manage system configuration, users/roles, oversee all teams/projects
+- **Permissions**:
+  - Create/remove users
+  - Assign user roles
+  - View and modify all tasks
+  - Access system analytics
 
-   ```bash
-   yarn create next-app --example with-supabase with-supabase-app
-   ```
+### Team Manager
 
-   ```bash
-   pnpm create next-app --example with-supabase with-supabase-app
-   ```
+- **Responsibilities**: Manage team tasks and schedules, assign tasks, monitor progress
+- **Permissions**:
+  - Create / edit / assign / update / view team tasks
+  - Create calendar events
 
-3. Use `cd` to change into the app's directory
+### Team Member
 
-   ```bash
-   cd with-supabase-app
-   ```
+- **Responsibilities**: Complete assigned tasks, update progress, manage personal schedules
+- **Permissions**:
+  - View / update / comment on assigned tasks
+  - View / add notes to calendar events
 
-4. Rename `.env.example` to `.env.local` and update the following:
+## Technology stack
 
-  ```env
-  NEXT_PUBLIC_SUPABASE_URL=[INSERT SUPABASE PROJECT URL]
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=[INSERT SUPABASE PROJECT API PUBLISHABLE OR ANON KEY]
-  ```
-  > [!NOTE]
-  > This example uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, which refers to Supabase's new **publishable** key format.
-  > Both legacy **anon** keys and new **publishable** keys can be used with this variable name during the transition period. Supabase's dashboard may show `NEXT_PUBLIC_SUPABASE_ANON_KEY`; its value can be used in this example.
-  > See the [full announcement](https://github.com/orgs/supabase/discussions/29260) for more information.
+- **Frontend**: Next.js (React), Tailwind CSS, shadcn/ui
+- **Backend/API**: Next.js Route Handlers (`src/app/api/*`)
+- **Database**: PostgreSQL (Supabase)
+- **Authentication**: Supabase Auth (session/cookies via `@supabase/ssr`)
+- **Deployment**: Vercel (recommended for Next.js)
 
-  Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` can be found in [your Supabase project's API settings](https://supabase.com/dashboard/project/_?showConnect=true)
+## Installation & setup instructions
 
-5. You can now run the Next.js local development server:
+### Prerequisites
 
-   ```bash
-   npm run dev
-   ```
+- Node.js (LTS recommended)
+- A Supabase project (PostgreSQL + Auth)
 
-   The starter kit should now be running on [localhost:3000](http://localhost:3000/).
+### 1) Install dependencies
 
-6. This template comes with the default shadcn/ui style initialized. If you instead want other ui.shadcn styles, delete `components.json` and [re-install shadcn/ui](https://ui.shadcn.com/docs/installation/next)
+```bash
+npm install
+```
 
-> Check out [the docs for Local Development](https://supabase.com/docs/guides/getting-started/local-development) to also run Supabase locally.
+### 2) Configure environment variables
 
-## Feedback and issues
+Create a `.env.local` file at the project root:
 
-Please file feedback and issues over on the [Supabase GitHub org](https://github.com/supabase/supabase/issues/new/choose).
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://vuyfydtnvxzyclzchpfe.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_Y-8z-TKgx-dVEr3nlDpsfg_z9UicZMy
 
-## More Supabase examples
+SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_SECRET=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
+```
 
-- [Next.js Subscription Payments Starter](https://github.com/vercel/nextjs-subscription-payments)
-- [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
-- [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
+Where to find these in Supabase:
+
+- **Project URL**: Supabase Dashboard → Project Settings → API
+- **Publishable/Anon key**: Supabase Dashboard → Project Settings → API
+- **Service role key**: Supabase Dashboard → Project Settings → API (keep secret; never expose to the client)
+
+## How to run the system
+
+### Development
+
+```bash
+npm run dev
+```
+
+Then open `http://localhost:3000`.
+
+### Production build
+
+```bash
+npm run build
+npm run start
+```
+
+### Lint
+
+```bash
+npm run lint
+```
