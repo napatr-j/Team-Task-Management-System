@@ -56,7 +56,7 @@ export async function GET(
 
     const profilesQuery = supabase
       .from("profiles")
-      .select("id,email,full_name,avatar_url");
+      .select("id,email,avatar_url");
     if (userIds.length > 0) {
       profilesQuery.in("id", userIds);
     }
@@ -80,9 +80,9 @@ export async function GET(
       return {
         id: member.user_id,
         email: authUser?.email ?? profile?.email ?? member.user_id,
-        fullName: profile?.full_name ?? undefined,
+        fullName: profile?.email ?? undefined,
         role: mapRole(roleRow?.role_id),
-        avatarInitials: buildInitials(profile?.full_name ?? authUser?.email ?? profile?.email),
+        avatarInitials: buildInitials(authUser?.email ?? profile?.email ?? member.user_id),
       };
     }) ?? [];
 
