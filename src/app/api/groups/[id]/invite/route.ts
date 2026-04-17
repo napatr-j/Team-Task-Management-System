@@ -76,7 +76,7 @@ export async function POST(
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name,avatar_url")
+      .select("email,avatar_url")
       .eq("id", targetUser.id)
       .maybeSingle();
 
@@ -119,9 +119,9 @@ export async function POST(
       {
         id: targetUser.id,
         email: targetUser.email,
-        fullName: profile?.full_name ?? null,
+        fullName: profile?.email ?? null,
         role,
-        avatarInitials: buildInitials(profile?.full_name, targetUser.email),
+        avatarInitials: buildInitials(profile?.email ?? targetUser.email),
       },
       { status: 200 },
     );
