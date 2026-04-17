@@ -1,5 +1,5 @@
 import { Task, User } from "@/types/calendar";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import SubtaskForm from "./SubtaskForm";
 
 interface Props {
@@ -10,44 +10,54 @@ interface Props {
 }
 
 export default function AddTaskModal({ users, onClose, onAdd, tasks }: Props) {
-  const [form, setForm] = useState<Partial<Task>>({
-    title: "",
-    description: "",
-    status: "todo",
-    priority: "medium",
-    deadline: "",
-    assigned_to: users[0]?.email,
-    created_by: users[0]?.email,
-    created_at: new Date().toISOString(),
-  });
+  const minDeadline = new Date().toISOString().slice(0, 10);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<Task["status"]>("todo");
+  const [priority, setPriority] = useState<Task["priority"]>("medium");
+  const [deadline, setDeadline] = useState("");
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>(
+    users.length > 0 ? [users[0].email] : [],
+  );
   const [hasSubtask, setHasSubtask] = useState(false);
-  const [subtasks, setSubtasks] = useState<Partial<Task>[]>([]);
+  const [subtasks, setSubtasks] = useState<Array<{ title: string; status: Task["status"]; priority: Task["priority"] }>>([]);
   const [isSubtask, setIsSubtask] = useState(false);
   const [parentTaskId, setParentTaskId] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const assigneeOptions = useMemo(() => users, [users]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const toggleAssignee = (email: string) => {
+    setSelectedAssignees((current) =>
+      current.includes(email) ? current.filter((item) => item !== email) : [...current, email],
+    );
   };
 
   const handleAdd = () => {
-    const id = Math.random().toString(36).slice(2);
-    const mainTask: Task = {
-      ...(form as Task),
-      id,
-      parent_task_id: isSubtask ? parentTaskId : undefined,
+    if (!title.trim()) {
+      setError("Task title is required.");
+      return;
+    }
+
+    if (users.length > 0 && selectedAssignees.length === 0) {
+      setError("Please assign the task to at least one member.");
+      return;
+    }
+
+    const taskPayload: Task = {
+      id: Math.random().toString(36).slice(2),
+      title: title.trim(),
+      description: description.trim(),
+      status,
+      priority,
+      deadline: deadline || minDeadline,
+      assigned_to: selectedAssignees.length > 0 ? selectedAssignees : "",
+      created_by: users[0]?.email ?? "",
+      created_at: new Date().toISOString(),
+      parent_task_id: isSubtask && parentTaskId ? parentTaskId : undefined,
+      subtasks: hasSubtask && subtasks.length > 0 ? subtasks : undefined,
     };
-    onAdd(mainTask);
-    // Optionally add subtasks
-    subtasks.forEach((st) => {
-      onAdd({
-        ...(st as Task),
-        id: Math.random().toString(36).slice(2),
-        parent_task_id: id,
-        created_by: form.created_by!,
-        assigned_to: st.assigned_to || form.assigned_to!,
-        created_at: new Date().toISOString(),
-      });
-    });
+
+    onAdd(taskPayload);
     onClose();
   };
 
@@ -58,91 +68,135 @@ export default function AddTaskModal({ users, onClose, onAdd, tasks }: Props) {
           <h3 className="text-lg font-bold text-[#1A1A1A]">Add Task</h3>
           <button onClick={onClose} className="text-2xl hover:text-[#84934A] transition duration-200">&times;</button>
         </div>
-        <div className="flex flex-col gap-3">
-          <input
-            className="border rounded-lg px-2 py-1"
-            name="title"
-            placeholder="Title"
-            value={form.title}
-            onChange={handleChange}
-          />
-          <textarea
-            className="border rounded-lg px-2 py-1"
-            name="description"
-            placeholder="Description"
-            value={form.description}
-            onChange={handleChange}
-          />
-          <select
-            className="border rounded-lg px-2 py-1"
-            name="status"
-            value={form.status}
-            onChange={handleChange}
-          >
-            <option value="todo">To Do</option>
-            <option value="inprogress">In Progress</option>
-            <option value="done">Done</option>
-          </select>
-          <select
-            className="border rounded-lg px-2 py-1"
-            name="priority"
-            value={form.priority}
-            onChange={handleChange}
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-          <input
-            className="border rounded-lg px-2 py-1"
-            name="deadline"
-            type="date"
-            value={form.deadline?.slice(0, 10) || ""}
-            onChange={handleChange}
-          />
-          <select
-            className="border rounded-lg px-2 py-1"
-            name="assigned_to"
-            value={form.assigned_to}
-            onChange={handleChange}
-          >
-            {users.map((u) => (
-              <option key={u.email} value={u.email}>{u.email}</option>
-            ))}
-          </select>
-          <label className="flex items-center gap-2 mt-2">
+        <div className="grid gap-4">
+          <label className="block text-sm font-medium text-[#374151]">
+            Title
+            <input
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
+              placeholder="Task title"
+              required
+            />
+          </label>
+
+          <label className="block text-sm font-medium text-[#374151]">
+            Description
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              className="mt-2 h-28 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
+              placeholder="Describe the task"
+            />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-medium text-[#374151]">
+              Due date
+              <input
+                type="date"
+                min={minDeadline}
+                value={deadline}
+                onChange={(event) => setDeadline(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
+              />
+            </label>
+            <label className="block text-sm font-medium text-[#374151]">
+              Priority
+              <select
+                value={priority}
+                onChange={(event) => setPriority(event.target.value as Task["priority"])}
+                className="mt-2 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-sm font-medium text-[#374151]">
+            Status
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as Task["status"])}
+              className="mt-2 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
+            >
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+
+          <div className="space-y-3 rounded-2xl border border-[#D1D5DB] bg-[#F8FAFB] p-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-medium text-[#374151]">Assign members</p>
+              <span className="text-xs text-[#6B7280]">Select at least one</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {assigneeOptions.length === 0 ? (
+                <p className="text-sm text-[#6B7280]">No members available yet.</p>
+              ) : (
+                assigneeOptions.map((user) => {
+                  const isSelected = selectedAssignees.includes(user.email);
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      onClick={() => toggleAssignee(user.email)}
+                      className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                        isSelected
+                          ? "border-[#84934A] bg-[#EAF0E2] text-[#1F4330]"
+                          : "border-[#D1D5DB] bg-[#F8FAFC] text-[#374151] hover:bg-[#EFF3EE]"
+                      }`}
+                    >
+                      {user.email}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm text-[#374151]">
             <input
               type="checkbox"
               checked={hasSubtask}
-              onChange={() => setHasSubtask((v) => !v)}
+              onChange={() => setHasSubtask((current) => !current)}
+              className="h-4 w-4 rounded border-[#D1D5DB] text-[#84934A] focus:ring-[#84934A]"
             />
-            Has Subtask
+            Add subtasks
           </label>
-          {hasSubtask && (
-            <SubtaskForm subtasks={subtasks} setSubtasks={setSubtasks} users={users} />
-          )}
-          <label className="flex items-center gap-2 mt-2">
+          {hasSubtask && <SubtaskForm subtasks={subtasks} setSubtasks={setSubtasks} />}
+
+          <label className="flex items-center gap-2 text-sm text-[#374151]">
             <input
               type="checkbox"
               checked={isSubtask}
-              onChange={() => setIsSubtask((v) => !v)}
+              onChange={() => setIsSubtask((current) => !current)}
+              className="h-4 w-4 rounded border-[#D1D5DB] text-[#84934A] focus:ring-[#84934A]"
             />
-            Is Subtask
+            Create as subtask
           </label>
           {isSubtask && (
             <select
-              className="border rounded-lg px-2 py-1"
               value={parentTaskId}
-              onChange={e => setParentTaskId(e.target.value)}
+              onChange={(event) => setParentTaskId(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] px-4 py-3 text-sm text-[#111827] outline-none focus:border-[#84934A] focus:ring-2 focus:ring-[#84934A]/20"
             >
-              <option value="">Select Parent Task</option>
+              <option value="">Select parent task</option>
               {tasks
-                .filter((t) => !t.parent_task_id)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>{t.title}</option>
+                .filter((task) => !task.parent_task_id)
+                .map((task) => (
+                  <option key={task.id} value={task.id}>{task.title}</option>
                 ))}
             </select>
           )}
+
+          {error ? (
+            <div className="rounded-2xl border border-[#FECACA] bg-[#FEF2F2] px-4 py-3 text-sm text-[#991B1B]">{error}</div>
+          ) : null}
         </div>
         <div className="flex gap-2 mt-6">
           <button
