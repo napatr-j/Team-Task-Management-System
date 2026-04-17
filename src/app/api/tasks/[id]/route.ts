@@ -1,6 +1,12 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+function normalizeStatus(status?: string) {
+  if (status === "inprogress") return "in_progress";
+  if (status === "in_progress" || status === "todo" || status === "done") return status;
+  return "todo";
+}
+
 async function authorizeUserForTask(supabase: Awaited<ReturnType<typeof createClient>>, taskId: string, userId: string) {
   const { data: task, error: taskError } = await supabase
     .from("tasks")
@@ -74,7 +80,7 @@ export async function PATCH(
   if (body.description !== undefined) updates.description = body.description;
   if (body.deadline !== undefined) updates.deadline = body.deadline;
   if (body.priority !== undefined) updates.priority = body.priority;
-  if (body.status !== undefined) updates.status = body.status;
+  if (body.status !== undefined) updates.status = normalizeStatus(body.status);
 
   const { data: updatedTask, error } = await supabase
     .from("tasks")
