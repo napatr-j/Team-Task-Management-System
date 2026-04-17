@@ -1,4 +1,4 @@
-import { Group } from "@/types/group";
+import { Group, GroupMemberRole } from "@/types/group";
 import { createClient } from "@/lib/supabase/server";
 import { GroupDetailView } from "@/components/groups/GroupDetailView";
 
@@ -18,7 +18,7 @@ function buildInitials(fullName: string | null | undefined) {
   return `${words[0][0]}${words[1][0]}`.toUpperCase();
 }
 
-function mapRole(roleId: number | null | undefined) {
+function mapRole(roleId: number | null | undefined): GroupMemberRole {
   if (roleId === 1) return "Admin";
   if (roleId === 2) return "Manager";
   return "Member";
@@ -72,7 +72,7 @@ export default async function GroupPage({ params }: GroupPageProps) {
 
   const userIds = [...new Set(teamMembers?.map((row) => row.user_id) ?? [])];
 
-  const profilesQuery = supabase.from("profiles").select("id,full_name,avatar_url");
+  const profilesQuery = supabase.from("profiles").select("id,email,avatar_url");
   if (userIds.length > 0) {
     profilesQuery.in("id", userIds);
   }
@@ -95,10 +95,10 @@ export default async function GroupPage({ params }: GroupPageProps) {
     const roleRow = roleRows?.find((role) => role.user_id === member.user_id);
     return {
       id: member.user_id,
-      email: authUser?.email ?? member.user_id,
-      fullName: profile?.full_name ?? undefined,
+      email: authUser?.email ?? profile?.email ?? member.user_id,
+      fullName: profile?.email ?? undefined,
       role: mapRole(roleRow?.role_id),
-      avatarInitials: buildInitials(profile?.full_name ?? authUser?.email),
+      avatarInitials: buildInitials(authUser?.email ?? profile?.email ?? member.user_id),
     };
   }) ?? [];
 
