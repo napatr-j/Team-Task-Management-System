@@ -3,7 +3,7 @@ import type { PostgrestResponse } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
 type AssigneeRow = { task_id: string; user_id: string };
-type ProfileRow = { id: string; full_name: string | null; avatar_url: string | null };
+type ProfileRow = { id: string; email: string | null; avatar_url: string | null };
 
 type TaskRow = {
   id: string;
@@ -45,7 +45,7 @@ async function getTaskAssignees(supabase: Awaited<ReturnType<typeof createClient
   const userIds = Array.from(new Set(assigneeRows.map((row) => row.user_id)));
   const { data: profiles, error: profileError } = (await supabase
     .from("profiles")
-    .select("id,full_name,avatar_url")
+    .select("id,email,avatar_url")
     .in("id", userIds)) as PostgrestResponse<ProfileRow>;
 
   if (profileError || !profiles) {
@@ -54,9 +54,10 @@ async function getTaskAssignees(supabase: Awaited<ReturnType<typeof createClient
 
   const profileMap = profiles.reduce<Record<string, { id: string; avatarUrl?: string; initials?: string }>>(
     (map, profile) => {
-      const initials = profile.full_name
-        ? profile.full_name
-            .split(" ")
+      const initials = profile.email
+        ? profile.email
+            .split("@")[0]
+            .split(/\W+/)
             .map((part) => part[0])
             .join("")
             .slice(0, 2)
