@@ -53,6 +53,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { data: updatedTask, error: updateError } = await supabase
       .from("tasks")
       .update(updates)
+      .select()
       .eq("id", taskId)
       .single();
 
@@ -172,11 +173,16 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     const { data: deletedTask, error: deleteError } = await supabase
       .from("tasks")
       .delete()
+      .select()
       .eq("id", taskId)
       .single();
 
-    if (deleteError || !deletedTask) {
-      return NextResponse.json({ message: "Unable to delete task" }, { status: 500 });
+    if (deleteError) {
+      return NextResponse.json({ message: deleteError.message || "Unable to delete task" }, { status: 500 });
+    }
+
+    if (!deletedTask) {
+      return NextResponse.json({ message: "Task not found" }, { status: 404 });
     }
 
     return NextResponse.json({ task: deletedTask });
