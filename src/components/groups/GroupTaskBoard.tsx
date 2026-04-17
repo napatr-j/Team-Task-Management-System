@@ -34,10 +34,12 @@ const priorityClasses: Record<GroupTask["priority"], string> = {
 export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
   const [tasks, setTasks] = useState<GroupTask[]>([]);
   const [members, setMembers] = useState<GroupMember[]>([]);
+  const [canCreateTasks, setCanCreateTasks] = useState(false);
   const [modalTask, setModalTask] = useState<GroupTask | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadTasks() {
@@ -58,8 +60,11 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
         const data = await response.json();
         if (!response.ok) throw new Error(data?.message || "Unable to load members.");
         setMembers(data.members ?? []);
+        setCanCreateTasks(Boolean(data.canCreateTasks));
       } catch (err) {
         console.warn(err);
+        setMembers([]);
+        setCanCreateTasks(false);
       }
     }
 
@@ -92,7 +97,9 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
     }
   };
 
-  const updateTask = async (patch: { id: string; title?: string; description?: string; deadline?: string | null; priority?: GroupTask["priority"]; status?: GroupTask["status"]; assigneeIds?: string[]; subtasks?: Array<{ title: string; status: GroupTask["status"]; assigneeIds: string[] }> }) => {
+  const updateTask = async (patch: { id: string; title?: string; description?: string; deadline?: string | null; priority?: GroupTask["priority"]; status?: GroupTask["status"]; assigneeIds?: string[]; parentTaskId?: string; subtasks?: Array<{ title: string; description?: string; deadline?: string | null; priority?: GroupTask["priority"]; status: GroupTask["status"]; assigneeIds: string[] }> }) => {
+    setError(null);
+    setSuccessMessage(null);
     try {
       const response = await fetch(`/api/groups/${groupId}/tasks/${patch.id}`, {
         method: "PATCH",
@@ -104,6 +111,7 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
       await refreshTasks();
       setModalTask(null);
       setShowTaskModal(false);
+      setSuccessMessage("Task updated successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to update task.");
     }
@@ -111,12 +119,19 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
 
   const handleDelete = async (id: string) => {
     setError(null);
+    setSuccessMessage(null);
+
+    if (!window.confirm("Are you sure you want to delete this task? This action cannot be undone.")) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/groups/${groupId}/tasks/${id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to delete task.");
       setTasks((current) => current.filter((task) => task.id !== id));
       setModalTask((current) => (current?.id === id ? null : current));
+      setSuccessMessage("Task deleted successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to delete task.");
     }
@@ -133,6 +148,7 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
     subtasks?: Array<{ title: string; status: GroupTask["status"]; assigneeIds: string[] }>;
   }) => {
     setError(null);
+    setSuccessMessage(null);
     setIsSaving(true);
     try {
       const method = formData.id ? "PATCH" : "POST";
@@ -149,6 +165,7 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
       await refreshTasks();
       setModalTask(null);
       setShowTaskModal(false);
+      setSuccessMessage(formData.id ? "Task updated successfully." : "Task created successfully.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to save task.");
     } finally {
@@ -156,10 +173,33 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
     }
   };
 
+  const openNewTask = () => {
+    setModalTask(null);
+    setShowTaskModal(true);
+    setError(null);
+  };
+
+  const openEditTask = (task: GroupTask) => {
+    setModalTask(task);
+    setShowTaskModal(true);
+    setError(null);
+  };
+
+  const closeTaskModal = () => {
+    setShowTaskModal(false);
+    setModalTask(null);
+  };
+
   const changeStatus = async (task: GroupTask, nextStatus: GroupTask["status"]) => {
     if (task.status === nextStatus) return;
     await updateTask({ id: task.id, status: nextStatus });
   };
+
+  useEffect(() => {
+    if (!successMessage) return;
+    const timeout = window.setTimeout(() => setSuccessMessage(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [successMessage]);
 
   return (
     <div className="space-y-6">
@@ -175,14 +215,22 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
           <button
             type="button"
             onClick={openNewTask}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[#84934A] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#6a7b39]"
+            disabled={!canCreateTasks}
+            className="inline-flex items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition disabled:bg-[#D1D5DB] disabled:text-[#6B7280]"
+            style={{ backgroundColor: canCreateTasks ? "#84934A" : "#F3F4F6" }}
           >
             <span className="text-lg">+</span>
-            New task
+            {canCreateTasks ? "New task" : "Create disabled"}
           </button>
+          {!canCreateTasks ? (
+            <div className="mt-3 text-sm text-[#6B7280]">Only Admin or Manager can create tasks.</div>
+          ) : null}
         </div>
       </div>
 
+      {successMessage ? (
+        <div className="rounded-3xl border border-[#D1FAE5] bg-[#ECFDF5] p-5 text-sm text-[#065F46]">{successMessage}</div>
+      ) : null}
       {error ? (
         <div className="rounded-3xl border border-[#FECACA] bg-[#FEF2F2] p-5 text-sm text-[#991B1B]">{error}</div>
       ) : null}
@@ -221,6 +269,26 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
                           {statusLabel[task.status]}
                         </span>
                       </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm">
+                        {task.assignees.length > 0 ? (
+                          <div className="flex items-center gap-2">
+                            {task.assignees.slice(0, 2).map((assignee) => (
+                              <span
+                                key={assignee.id}
+                                title={assignee.email ?? assignee.id}
+                                className="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-[#F3F4F6] px-2 text-xs font-semibold text-[#374151]"
+                              >
+                                {assignee.initials ?? assignee.id.slice(0, 2).toUpperCase()}
+                              </span>
+                            ))}
+                            {task.assignees.length > 2 && (
+                              <span className="text-xs text-[#6B7280]">+{task.assignees.length - 2} more</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-[#6B7280]">Unassigned</span>
+                        )}
+                      </div>
                       <div className="flex flex-wrap items-center gap-2">
                         {boardColumns.map((column) => (
                           <button
@@ -258,21 +326,28 @@ export default function GroupTaskBoard({ groupId }: GroupTaskBoardProps) {
         ))}
       </div>
 
-      <button
-        type="button"
-        onClick={openNewTask}
-        aria-label="Add task"
-        className="fixed bottom-8 right-8 z-20 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#84934A] text-2xl font-semibold text-white shadow-lg transition hover:bg-[#6a7b39]"
-      >
-        +
-      </button>
+      {canCreateTasks ? (
+        <button
+          type="button"
+          onClick={openNewTask}
+          aria-label="Add task"
+          className="fixed bottom-8 right-8 z-20 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#84934A] text-2xl font-semibold text-white shadow-lg transition hover:bg-[#6a7b39]"
+        >
+          +
+        </button>
+      ) : null}
 
       {showTaskModal ? (
         <div className="fixed inset-0 z-50 overflow-auto bg-black/30 p-4">
           <div className="mx-auto w-full max-w-3xl">
             <TaskForm
               task={modalTask}
-              users={members.filter((member) => Boolean(member.email)) as Array<{ id: string; email: string; avatarUrl?: string; initials?: string }>}
+              users={members.map((member) => ({
+                id: member.id,
+                email: member.email ?? undefined,
+                avatarUrl: member.avatarUrl ?? undefined,
+              }))}
+              availableParentTasks={tasks}
               onSubmit={handleSubmit}
               onCancel={closeTaskModal}
               submitting={isSaving}
