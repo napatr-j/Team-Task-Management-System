@@ -1,71 +1,63 @@
-import { Task } from "@/types/calendar";
+import { Task, CalendarEvent } from "@/types/calendar";
 import CalendarCell from "./CalendarCell";
-import { useState } from "react";
 
 interface Props {
   tasks: Task[];
+  events?: CalendarEvent[];
+  viewMode?: "tasks" | "events" | "both";
   selectedDate: Date | null;
+  month: number;
+  year: number;
   onDateClick: (date: Date) => void;
   onTaskClick: (task: Task) => void;
+  onEventClick: (event: CalendarEvent) => void;
+  onMonthChange: (month: number, year: number) => void;
 }
 
 function getMonthMatrix(year: number, month: number) {
   const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
+  const startDate = new Date(year, month, 1 - firstDay.getDay());
   const matrix: Date[][] = [];
-  let week: Date[] = [];
-  let day = new Date(firstDay);
 
-  // Fill first week
-  for (let i = 0; i < firstDay.getDay(); i++) {
-    week.push(new Date(year, month, i - firstDay.getDay() + 1));
-  }
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    week.push(new Date(year, month, d));
-    if (week.length === 7) {
-      matrix.push(week);
-      week = [];
+  for (let week = 0; week < 6; week++) {
+    const weekRow: Date[] = [];
+    for (let day = 0; day < 7; day++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + week * 7 + day);
+      weekRow.push(date);
     }
+    matrix.push(weekRow);
   }
-  // Fill last week
-  if (week.length) {
-    for (let i = week.length; i < 7; i++) {
-      week.push(new Date(year, month + 1, i - week.length + 1));
-    }
-    matrix.push(week);
-  }
+
   return matrix;
 }
 
 export default function CalendarGrid({
   tasks,
+  events,
+  viewMode = "both",
   selectedDate,
+  month,
+  year,
   onDateClick,
   onTaskClick,
+  onEventClick,
+  onMonthChange,
 }: Props) {
-  const [month, setMonth] = useState(
-    selectedDate ? selectedDate.getMonth() : new Date().getMonth()
-  );
-  const [year, setYear] = useState(
-    selectedDate ? selectedDate.getFullYear() : new Date().getFullYear()
-  );
-
   const matrix = getMonthMatrix(year, month);
 
   const handlePrev = () => {
     if (month === 0) {
-      setMonth(11);
-      setYear(y => y - 1);
+      onMonthChange(11, year - 1);
     } else {
-      setMonth(m => m - 1);
+      onMonthChange(month - 1, year);
     }
   };
   const handleNext = () => {
     if (month === 11) {
-      setMonth(0);
-      setYear(y => y + 1);
+      onMonthChange(0, year + 1);
     } else {
-      setMonth(m => m + 1);
+      onMonthChange(month + 1, year);
     }
   };
 
@@ -104,22 +96,28 @@ export default function CalendarGrid({
           </div>
         ))}
         {matrix.flat().map((date, idx) => {
-          const dayTasks = tasks.filter(
-            (t) =>
-              new Date(t.deadline).toDateString() === date.toDateString()
-          );
+          const showTasks = viewMode !== "events";
+          const showEvents = viewMode !== "tasks";
+          const dayTasks = showTasks
+            ? tasks.filter((t) => new Date(t.deadline).toDateString() === date.toDateString())
+            : [];
+          const dayEvents = showEvents
+            ? (events ?? []).filter((event) => new Date(event.start_time).toDateString() === date.toDateString())
+            : [];
           return (
             <CalendarCell
               key={idx}
               date={date}
               isToday={isToday(date)}
               isSelected={
-                selectedDate &&
+                selectedDate !== null &&
                 date.toDateString() === selectedDate.toDateString()
               }
               tasks={dayTasks}
+              events={dayEvents}
               onClick={() => onDateClick(date)}
               onTaskClick={onTaskClick}
+              onEventClick={onEventClick}
               isCurrentMonth={date.getMonth() === month}
             />
           );
