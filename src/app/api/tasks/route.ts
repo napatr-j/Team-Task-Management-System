@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const grouped: Record<string, any[]> = {};
+  const grouped: Record<string, unknown[]> = {};
 
   (tasks || []).forEach((t) => {
     if (!t.deadline) return;
@@ -71,6 +71,12 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json(grouped);
+}
+
+function normalizeStatus(status?: string) {
+  if (status === "inprogress") return "in_progress";
+  if (status === "in_progress" || status === "todo" || status === "done") return status;
+  return "todo";
 }
 
 export async function POST(req: NextRequest) {
@@ -91,17 +97,120 @@ export async function POST(req: NextRequest) {
     if (!authorized) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
+
+    const { data: roleRow, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role_id")
+      .eq("team_id", team_id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (roleError || !roleRow || ![1, 2].includes(roleRow.role_id)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
   }
+
+  const title = data.title as string | undefined;
+  if (!title) {
+    return NextResponse.json({ message: "Task title is required" }, { status: 400 });
+  }
+
+  const assigneeEmails = Array.isArray(data.assigned_to)
+    ? data.assigned_to.filter(Boolean)
+    : data.assigned_to
+    ? [data.assigned_to]
+    : [];
+
+  const taskPayload = {
+    title,
+    description: data.description ?? null,
+    deadline: data.deadline || null,
+    priority: data.priority ?? "medium",
+    status: normalizeStatus(data.status),
+    team_id: team_id ?? null,
+    created_by: user.id,
+    parent_task_id: data.parent_task_id ?? null,
+  };
 
   const { data: inserted, error } = await supabase
     .from("tasks")
-    .insert([data])
+    .insert([taskPayload])
     .select()
     .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error || !inserted) {
+    return NextResponse.json({ error: error?.message || "Unable to create task" }, { status: 500 });
   }
 
-  return NextResponse.json(inserted);
+  if (assigneeEmails.length > 0) {
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,email")
+      .in("email", assigneeEmails);
+
+    if (!profileError && profiles) {
+      const assigneeRows = profiles.map((profile: { id: string }) => ({
+        task_id: inserted.id,
+        user_id: profile.id,
+      }));
+
+      if (assigneeRows.length > 0) {
+        const { error: assignError } = await supabase.from("task_assignees").insert(assigneeRows);
+        if (assignError) {
+          return NextResponse.json({ error: assignError.message }, { status: 500 });
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(data.subtasks) && data.subtasks.length > 0) {
+    const subtasks = data.subtasks as Array<{
+      title: string;
+      description?: string;
+      deadline?: string | null;
+      priority?: string;
+      status?: string;
+      assigneeIds?: string[];
+    }>;
+
+    const childTaskRows = subtasks.map((subtask) => ({
+      title: subtask.title,
+      description: subtask.description ?? null,
+      deadline: subtask.deadline || null,
+      priority: subtask.priority ?? "medium",
+      status: normalizeStatus(subtask.status),
+      team_id: team_id ?? null,
+      created_by: user.id,
+      parent_task_id: inserted.id,
+    }));
+
+    const { data: insertedChildTasks, error: childTasksError } = await supabase
+      .from("tasks")
+      .insert(childTaskRows)
+      .select("id");
+
+    if (childTasksError || !insertedChildTasks) {
+      return NextResponse.json({ error: childTasksError?.message || "Unable to create subtasks" }, { status: 500 });
+    }
+
+    const subtaskAssignees = subtasks.flatMap((subtask, index) => {
+      const childTaskId = insertedChildTasks[index]?.id;
+      if (!childTaskId || !Array.isArray(subtask.assigneeIds)) return [];
+      return subtask.assigneeIds.map((userId) => ({ task_id: childTaskId, user_id: userId }));
+    });
+
+    if (subtaskAssignees.length > 0) {
+      const { error: assignError } = await supabase.from("task_assignees").insert(subtaskAssignees);
+      if (assignError) {
+        return NextResponse.json({ error: assignError.message }, { status: 500 });
+      }
+    }
+  }
+
+  const responseTask = {
+    ...inserted,
+    assigned_to: assigneeEmails.length > 0 ? assigneeEmails : undefined,
+  };
+
+  return NextResponse.json(responseTask);
 }
