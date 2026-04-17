@@ -1,9 +1,9 @@
 import { Task, User } from "@/types/calendar";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const statusOptions = [
   { value: "todo", label: "To Do" },
-  { value: "inprogress", label: "In Progress" },
+  { value: "in_progress", label: "In Progress" },
   { value: "done", label: "Done" },
 ];
 
@@ -21,19 +21,40 @@ interface Props {
 }
 
 export default function TaskModal({ task, users, onClose, onUpdate }: Props) {
-  const user = users.find((u) => u.email === task.assigned_to);
-  const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState(task);
+  const assignedEmails = useMemo(() => {
+    const directEmails = Array.isArray(task.assigned_to)
+      ? task.assigned_to
+      : task.assigned_to
+      ? [task.assigned_to]
+      : [];
 
-  // Assume current user is owner/manager for demo
+    if (directEmails.length > 0) return directEmails;
+    if (Array.isArray(task.assignees) && task.assignees.length > 0) {
+      return task.assignees
+        .map((assignee) => users.find((user) => user.id === assignee.id)?.email ?? assignee.initials ?? assignee.id)
+        .filter(Boolean);
+    }
+
+    return [];
+  }, [task.assigned_to, task.assignees, users]);
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState<Task>(task);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>(assignedEmails);
+
   const canEdit = true;
+
+  const toggleAssignee = (email: string) => {
+    setSelectedAssignees((current) =>
+      current.includes(email) ? current.filter((item) => item !== email) : [...current, email],
+    );
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSave = () => {
-    onUpdate(form);
+    onUpdate({ ...form, assigned_to: selectedAssignees });
     setEdit(false);
   };
 
@@ -79,22 +100,38 @@ export default function TaskModal({ task, users, onClose, onUpdate }: Props) {
                   <option key={p.value} value={p.value}>{p.label}</option>
                 ))}
               </select>
-              <select
-                className="border rounded-lg px-2 py-1"
-                name="assigned_to"
-                value={form.assigned_to}
-                onChange={handleChange}
-              >
-                {users.map((u) => (
-                  <option key={u.email} value={u.email}>{u.email}</option>
-                ))}
-              </select>
+              <div className="space-y-2 rounded-2xl border border-[#D1D5DB] bg-[#F8FAFB] p-3">
+                <span className="text-sm font-medium text-[#374151]">Assign members</span>
+                <div className="flex flex-wrap gap-2">
+                  {users.length === 0 ? (
+                    <span className="text-sm text-[#6B7280]">No members available.</span>
+                  ) : (
+                    users.map((user) => {
+                      const active = selectedAssignees.includes(user.email);
+                      return (
+                        <button
+                          key={user.id}
+                          type="button"
+                          onClick={() => toggleAssignee(user.email)}
+                          className={`rounded-full border px-3 py-2 text-sm transition ${
+                            active
+                              ? "border-[#84934A] bg-[#EAF0E2] text-[#1F4330]"
+                              : "border-[#D1D5DB] bg-[#F8FAFC] text-[#374151] hover:bg-[#EFF3EE]"
+                          }`}
+                        >
+                          {user.email}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
               <input
                 className="border rounded-lg px-2 py-1"
                 name="deadline"
                 type="date"
                 value={form.deadline.slice(0, 10)}
-                onChange={e => setForm({ ...form, deadline: e.target.value })}
+                onChange={(e) => setForm({ ...form, deadline: e.target.value })}
               />
             </>
           ) : (
@@ -112,13 +149,13 @@ export default function TaskModal({ task, users, onClose, onUpdate }: Props) {
                 <span className="font-semibold">Priority:</span> {task.priority}
               </div>
               <div>
-                <span className="font-semibold">Assigned to:</span> {user?.email}
+                <span className="font-semibold">Assigned to:</span> {selectedAssignees.length > 0 ? selectedAssignees.join(", ") : "Unassigned"}
               </div>
               <div>
-                <span className="font-semibold">Created at:</span> {task.created_at.slice(0, 10)}
+                <span className="font-semibold">Created at:</span> {task.created_at ? task.created_at.slice(0, 10) : "Unknown"}
               </div>
               <div>
-                <span className="font-semibold">Deadline:</span> {task.deadline.slice(0, 10)}
+                <span className="font-semibold">Deadline:</span> {task.deadline ? task.deadline.slice(0, 10) : "No deadline"}
               </div>
             </>
           )}
