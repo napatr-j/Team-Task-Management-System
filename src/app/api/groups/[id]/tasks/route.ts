@@ -1,21 +1,26 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-type TaskAssigneeProfile = { id: string; avatarUrl?: string; initials?: string };
+type TaskAssigneeProfile = { id: string; avatarUrl?: string; initials?: string; email?: string };
 type TaskAssigneeMap = Record<string, TaskAssigneeProfile[]>;
-type SubtaskWithAssignees = {
+type ChildTask = {
   id: string;
   title: string;
   status: string;
-  assignees: TaskAssigneeProfile[];
+  parent_task_id?: string | null;
 };
-type SubtaskMap = Record<string, SubtaskWithAssignees[]>;
-type CreatedSubtask = {
+type ChildTaskMap = Record<string, ChildTask[]>;
+type CreatedChildTask = {
   id: string;
   title: string;
+  description: string | null;
+  deadline: string | null;
+  priority: string;
   status: string;
   assignees: TaskAssigneeProfile[];
 };
+
+type TaskRows = Array<{ id: string; title: string; description: string | null; deadline: string | null; priority: string | null; status: string | null; created_by: string | null }>;
 
 async function getTaskAssignees(supabase: any, taskIds: string[]): Promise<TaskAssigneeMap> {
   if (taskIds.length === 0) return {};
@@ -30,15 +35,16 @@ async function getTaskAssignees(supabase: any, taskIds: string[]): Promise<TaskA
   const userIds = Array.from(new Set(rows.map((row: { user_id: string }) => row.user_id)));
   const { data: profiles, error: profileError } = await supabase
     .from("profiles")
-    .select("id,full_name,avatar_url")
+    .select("id,email,avatar_url")
     .in("id", userIds);
 
   if (profileError || !profiles) return {};
 
-  const profileMap = profiles.reduce((acc: Record<string, TaskAssigneeProfile>, profile: { id: string; full_name?: string | null; avatar_url?: string | null }) => {
-    const initials = profile.full_name
-      ? profile.full_name
-          .split(" ")
+  const profileMap = profiles.reduce((acc: Record<string, TaskAssigneeProfile>, profile: { id: string; email?: string | null; avatar_url?: string | null }) => {
+    const initials = profile.email
+      ? profile.email
+          .split("@")[0]
+          .split(/\W+/)
           .map((part: string) => part[0])
           .join("")
           .slice(0, 2)
@@ -49,6 +55,7 @@ async function getTaskAssignees(supabase: any, taskIds: string[]): Promise<TaskA
       id: profile.id,
       avatarUrl: profile.avatar_url ?? undefined,
       initials,
+      email: profile.email ?? undefined,
     };
     return acc;
   }, {});
@@ -63,88 +70,31 @@ async function getTaskAssignees(supabase: any, taskIds: string[]): Promise<TaskA
   }, initial);
 }
 
-async function getSubtasksWithAssignees(supabase: any, taskIds: string[]): Promise<SubtaskMap> {
+async function getChildTasks(supabase: any, taskIds: string[]): Promise<ChildTaskMap> {
   if (taskIds.length === 0) return {};
 
-  const { data: subtasks, error: subtaskError } = await supabase
-    .from("subtasks")
-    .select("id,task_id,title,status")
-    .in("task_id", taskIds);
+  const { data: childTasks, error } = await supabase
+    .from("tasks")
+    .select("id,parent_task_id,title,status")
+    .in("parent_task_id", taskIds);
 
-  if (subtaskError || !subtasks) return {};
+  if (error || !childTasks) return {};
 
-  const subtaskIds = subtasks.map((subtask: { id: string }) => subtask.id);
-  const emptyMap: SubtaskMap = {};
-
-  if (subtaskIds.length === 0) {
-    return subtasks.reduce((acc: SubtaskMap, subtask: { task_id: string; id: string; title: string; status: string }) => {
-      acc[subtask.task_id] = acc[subtask.task_id] ?? [];
-      acc[subtask.task_id].push({ ...subtask, assignees: [] });
+  return (childTasks as Array<{ id: string; parent_task_id: string; title: string; status: string }>).reduce(
+    (acc: ChildTaskMap, child) => {
+      const parentId = child.parent_task_id;
+      if (!parentId) return acc;
+      if (!acc[parentId]) acc[parentId] = [];
+      acc[parentId].push({
+        id: child.id,
+        title: child.title,
+        status: child.status,
+        parent_task_id: child.parent_task_id,
+      });
       return acc;
-    }, emptyMap);
-  }
-
-  const { data: assignmentRows, error: assignmentError } = await supabase
-    .from("subtask_assignees")
-    .select("subtask_id,user_id")
-    .in("subtask_id", subtaskIds);
-
-  if (assignmentError || !assignmentRows) {
-    return subtasks.reduce((acc: SubtaskMap, subtask: { task_id: string; id: string; title: string; status: string }) => {
-      acc[subtask.task_id] = acc[subtask.task_id] ?? [];
-      acc[subtask.task_id].push({ ...subtask, assignees: [] });
-      return acc;
-    }, emptyMap);
-  }
-
-  const userIds = Array.from(new Set(assignmentRows.map((row: { user_id: string }) => row.user_id)));
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select("id,full_name,avatar_url")
-    .in("id", userIds);
-
-  if (profileError || !profiles) {
-    return subtasks.reduce((acc: SubtaskMap, subtask: { task_id: string; id: string; title: string; status: string }) => {
-      acc[subtask.task_id] = acc[subtask.task_id] ?? [];
-      acc[subtask.task_id].push({ ...subtask, assignees: [] });
-      return acc;
-    }, emptyMap);
-  }
-
-  const profileMap = profiles.reduce((acc: Record<string, TaskAssigneeProfile>, profile: { id: string; full_name?: string | null; avatar_url?: string | null }) => {
-    const initials = profile.full_name
-      ? profile.full_name
-          .split(" ")
-          .map((part: string) => part[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
-      : undefined;
-
-    acc[profile.id] = {
-      id: profile.id,
-      avatarUrl: profile.avatar_url ?? undefined,
-      initials,
-    };
-    return acc;
-  }, {});
-
-  const assigneeMap: Record<string, TaskAssigneeProfile[]> = assignmentRows.reduce((acc: Record<string, TaskAssigneeProfile[]>, row: { subtask_id: string; user_id: string }) => {
-    const profile = profileMap[row.user_id];
-    if (!profile) return acc;
-    if (!acc[row.subtask_id]) acc[row.subtask_id] = [];
-    acc[row.subtask_id].push(profile);
-    return acc;
-  }, {} as Record<string, TaskAssigneeProfile[]>);
-
-  return subtasks.reduce((acc: SubtaskMap, subtask: { task_id: string; id: string; title: string; status: string }) => {
-    acc[subtask.task_id] = acc[subtask.task_id] ?? [];
-    acc[subtask.task_id].push({
-      ...subtask,
-      assignees: assigneeMap[subtask.id] ?? [],
-    });
-    return acc;
-  }, emptyMap);
+    },
+    {},
+  );
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -173,7 +123,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
     const { data: tasks, error } = await supabase
       .from("tasks")
-      .select("id,title,description,deadline,priority,status,created_by")
+      .select("id,title,description,deadline,priority,status,created_by,created_at")
       .eq("team_id", id)
       .order("deadline", { ascending: true });
 
@@ -184,7 +134,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const taskRows = tasks ?? [];
     const taskIds = taskRows.map((task) => task.id);
     const assigneeMap = await getTaskAssignees(supabase, taskIds);
-    const subtaskMap = await getSubtasksWithAssignees(supabase, taskIds);
+    const childTaskMap = await getChildTasks(supabase, taskIds);
 
     return NextResponse.json({
       tasks: taskRows.map((task) => ({
@@ -194,7 +144,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         priority: task.priority ?? "medium",
         status: task.status ?? "todo",
         assignees: assigneeMap[task.id] ?? [],
-        subtasks: subtaskMap[task.id] ?? [],
+        subtasks: childTaskMap[task.id] ?? [],
       })),
     });
   } catch (error) {
@@ -232,6 +182,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
+    const { data: roleRow, error: roleError } = await supabase
+      .from("user_roles")
+      .select("role_id")
+      .eq("team_id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (roleError || !roleRow || ![1, 2].includes(roleRow.role_id)) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+
     const { data: inserted, error: insertError } = await supabase
       .from("tasks")
       .insert([
@@ -243,6 +204,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           status: status ?? "todo",
           team_id: id,
           created_by: user.id,
+          parent_task_id: body.parentTaskId ?? null,
         },
       ])
       .select()
@@ -252,7 +214,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ message: "Unable to create task" }, { status: 500 });
     }
 
-    const assignees: Array<{ id: string; avatarUrl?: string; initials?: string }> = [];
+    const assignees: Array<{ id: string; avatarUrl?: string; initials?: string; email?: string }> = [];
     if (Array.isArray(assigneeIds) && assigneeIds.length > 0) {
       const { error: assignError } = await supabase.from("task_assignees").insert(
         assigneeIds.map((userId: string) => ({ task_id: inserted.id, user_id: userId })),
@@ -264,83 +226,107 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       const { data: profiles, error: profileError } = await supabase
         .from("profiles")
-        .select("id,full_name,avatar_url")
+        .select("id,email,avatar_url")
         .in("id", assigneeIds);
 
       if (!profileError && profiles) {
-        profiles.forEach((profile: { id: string; full_name?: string | null; avatar_url?: string | null }) => {
-          const initials = profile.full_name
-            ? profile.full_name
-                .split(" ")
+        profiles.forEach((profile: { id: string; email?: string | null; avatar_url?: string | null }) => {
+          const initials = profile.email
+            ? profile.email
+                .split("@")[0]
+                .split(/\W+/)
                 .map((part: string) => part[0])
                 .join("")
                 .slice(0, 2)
                 .toUpperCase()
             : undefined;
-          assignees.push({ id: profile.id, avatarUrl: profile.avatar_url ?? undefined, initials });
+          assignees.push({
+            id: profile.id,
+            avatarUrl: profile.avatar_url ?? undefined,
+            initials,
+            email: profile.email ?? undefined,
+          });
         });
       }
     }
 
-    const createdSubtasks: CreatedSubtask[] = [];
+    const createdSubtasks: CreatedChildTask[] = [];
     if (Array.isArray(subtasks) && subtasks.length > 0) {
       const subtaskRows = subtasks.map((subtask: any) => ({
-        task_id: inserted.id,
         title: subtask.title,
+        description: subtask.description ?? null,
+        deadline: subtask.deadline ?? null,
+        priority: subtask.priority ?? "medium",
         status: subtask.status ?? "todo",
+        team_id: id,
+        created_by: user.id,
+        parent_task_id: inserted.id,
       }));
 
       const { data: insertedSubtasks, error: subtaskError } = await supabase
-        .from("subtasks")
+        .from("tasks")
         .insert(subtaskRows)
-        .select();
+        .select("id,title,description,deadline,priority,status");
 
       if (subtaskError || !insertedSubtasks) {
         return NextResponse.json({ message: "Unable to create subtasks", error: String(subtaskError) }, { status: 500 });
       }
 
-      for (let index = 0; index < insertedSubtasks.length; index += 1) {
-        const created = insertedSubtasks[index];
-        const payload = subtasks[index];
-        const assigneeIdsForSubtask = Array.isArray(payload.assigneeIds) ? payload.assigneeIds : [];
-        const assigneesForSubtask: Array<{ id: string; avatarUrl?: string; initials?: string }> = [];
+      const assigneeRows = subtasks.flatMap((subtask: any, index: number) => {
+        const taskId = insertedSubtasks[index]?.id;
+        if (!taskId || !Array.isArray(subtask.assigneeIds)) return [];
+        return subtask.assigneeIds.map((userId: string) => ({ task_id: taskId, user_id: userId }));
+      });
 
-        if (assigneeIdsForSubtask.length > 0) {
-          const { error: subtaskAssignError } = await supabase.from("subtask_assignees").insert(
-            assigneeIdsForSubtask.map((userId: string) => ({ subtask_id: created.id, user_id: userId })),
-          );
-
-          if (subtaskAssignError) {
-            return NextResponse.json({ message: "Unable to assign subtask users", error: subtaskAssignError.message }, { status: 500 });
-          }
-
-          const { data: profiles, error: subtaskProfileError } = await supabase
-            .from("profiles")
-            .select("id,full_name,avatar_url")
-            .in("id", assigneeIdsForSubtask);
-
-          if (!subtaskProfileError && profiles) {
-            profiles.forEach((profile: { id: string; full_name?: string | null; avatar_url?: string | null }) => {
-              const initials = profile.full_name
-                ? profile.full_name
-                    .split(" ")
-                    .map((part: string) => part[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()
-                : undefined;
-              assigneesForSubtask.push({ id: profile.id, avatarUrl: profile.avatar_url ?? undefined, initials });
-            });
-          }
+      if (assigneeRows.length > 0) {
+        const { error: assignError } = await supabase.from("task_assignees").insert(assigneeRows);
+        if (assignError) {
+          return NextResponse.json({ message: "Unable to assign subtask users", error: assignError.message }, { status: 500 });
         }
-
-        createdSubtasks.push({
-          id: created.id,
-          title: created.title,
-          status: created.status,
-          assignees: assigneesForSubtask,
-        });
       }
+
+      const assigneeIdGroups = subtasks.map((subtask: any) => Array.isArray(subtask.assigneeIds) ? subtask.assigneeIds : []);
+      const profileIds = Array.from(new Set(assigneeIdGroups.flat()));
+      const profileMap: Record<string, TaskAssigneeProfile> = {};
+
+      if (profileIds.length > 0) {
+        const { data: profiles, error: profileError } = await supabase
+          .from("profiles")
+          .select("id,email,avatar_url")
+          .in("id", profileIds);
+
+        if (!profileError && profiles) {
+          profiles.forEach((profile: { id: string; email?: string | null; avatar_url?: string | null }) => {
+            const initials = profile.email
+              ? profile.email
+                  .split("@")[0]
+                  .split(/\W+/)
+                  .map((part: string) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()
+              : undefined;
+            profileMap[profile.id] = {
+              id: profile.id,
+              avatarUrl: profile.avatar_url ?? undefined,
+              initials,
+              email: profile.email ?? undefined,
+            };
+          });
+        }
+      }
+
+      createdSubtasks.push(
+        ...insertedSubtasks.map((subtask: any, index: number) => ({
+          id: subtask.id,
+          title: subtask.title,
+          description: subtask.description ?? "",
+          deadline: subtask.deadline ?? null,
+          priority: subtask.priority ?? "medium",
+          status: subtask.status ?? "todo",
+          assignees: (assigneeIdGroups[index] ?? []).map((userId: string) => profileMap[userId]).filter(Boolean) as TaskAssigneeProfile[],
+        })),
+      );
     }
 
     return NextResponse.json({
