@@ -15,9 +15,9 @@ interface CalendarWorkspaceProps {
 }
 
 export default function CalendarWorkspace({ groupId }: CalendarWorkspaceProps) {
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [month, setMonth] = useState<number>(new Date().getMonth());
-  const [year, setYear] = useState<number>(new Date().getFullYear());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [month, setMonth] = useState<number | null>(null);
+  const [year, setYear] = useState<number | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -30,9 +30,18 @@ export default function CalendarWorkspace({ groupId }: CalendarWorkspaceProps) {
   const [viewMode, setViewMode] = useState<"tasks" | "events" | "both">("both");
   const [loading, setLoading] = useState(true);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  
+  useEffect(() => {
+    const now = new Date();
+    setSelectedDate(now);
+    setMonth(now.getMonth());
+    setYear(now.getFullYear());
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
+      if (month === null || year === null) return;
+
       setLoading(true);
       try {
         let allTasks: Task[] = [];
@@ -212,7 +221,10 @@ export default function CalendarWorkspace({ groupId }: CalendarWorkspaceProps) {
     setEvents((current) => current.filter((event) => event.id !== eventId));
     setActiveEvent(null);
   };
-
+  
+  if (month === null || year === null || !selectedDate) {
+    return null;
+  }
   return (
     <div className="min-h-screen bg-[#ECECEC]">
       <main className="mx-auto flex min-h-screen max-w-[1600px] flex-col gap-6 p-8">

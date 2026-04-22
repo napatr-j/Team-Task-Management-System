@@ -121,7 +121,7 @@ export async function POST(
         email: targetUser.email,
         fullName: profile?.email ?? null,
         role,
-        avatarInitials: buildInitials(profile?.email ?? targetUser.email),
+        avatarInitials: buildInitials(null, profile?.email ?? targetUser.email),
       },
       { status: 200 },
     );
