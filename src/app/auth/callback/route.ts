@@ -11,5 +11,5 @@ export async function GET(request: Request) {
     await ensureUserProfile(supabase);
   }
 
-  return NextResponse.redirect("http://localhost:3000/protected/dashboard");
+  return NextResponse.redirect(`${origin}/protected/dashboard`);
 }
