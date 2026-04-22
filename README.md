@@ -124,3 +124,29 @@ npm run start
 ```bash
 npm run lint
 ```
+
+## Screenshots
+
+### Landing & Authentication
+
+| Landing Page | Login | Sign Up |
+|---|---|---|
+| ![Landing](./screenshot/user_landing.png) | ![Login](./screenshot/user_login.png) | ![Sign Up](./screenshot/user_signup.png) |
+
+### Main Features
+
+| Dashboard | Task Board | Task List |
+|---|---|---|
+| ![Dashboard](./screenshot/user_dashboard.png) | ![Task Board](./screenshot/user_task_board.png) | ![Task List](./screenshot/user_task_list.png) |
+
+### Collaboration & Planning
+
+| Group | Calendar | New Task |
+|---|---|---|
+| ![Group](./screenshot/user_group.png) | ![Calendar](./screenshot/user_calendar.png) | ![New Task](./screenshot/new_task_component.png) |
+
+### Codebase Overview
+
+| Code Structure | Code Charta |
+|---|---|
+| ![Code Structure](./screenshot/code_structure.png) | ![Code Charta](./screenshot/codecharta.png) |
